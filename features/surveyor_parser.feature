@@ -449,3 +449,56 @@ Feature: Survey parser
       | sad         | 0             |
       | indifferent | 1             |
       | happy       | 2             |
+
+  Scenario: Parsing mandatory questions
+    Given I parse
+    """
+      survey "Chores", :default_mandatory => true do
+        section "Morning" do
+          q "Did you take out the trash", :pick => :one
+          a "Yes"
+          a "No"
+
+          q "Did you do the laundry", :pick => :one
+          a "Yes"
+          a "No"
+
+          q "Optional comments", :is_mandatory => false
+          a :string
+        end
+      end
+    """
+    And there should be 3 questions with:
+      | text                       | is_mandatory |
+      | Did you take out the trash | true         |
+      | Did you do the laundry     | true         |
+      | Optional comments          | false        |
+
+  @javascript
+  Scenario: Parsing dependencies with "question_" and "answer_" syntax
+    Given I parse
+    """
+      survey "Days" do
+        section "Fridays" do
+          q_is_it_friday "Is it Friday?", :pick => :one
+          a_yes "Yes"
+          a_no  "No"
+
+          label "woot!"
+          dependency :rule => "A"
+          condition_A :question_is_it_friday, "==", :answer_yes
+        end
+      end
+    """
+    Then there should be 1 dependency with:
+      | rule |
+      | A    |
+    And there should be 1 resolved dependency_condition with:
+      | rule_key |
+      | A        |
+    When I go to the surveys page
+    And I start the "Days" survey
+    Then the question "woot!" should be hidden
+    And I choose "Yes"
+    Then the question "woot!" should be triggered
+

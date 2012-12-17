@@ -152,9 +152,11 @@ module SurveyorParserSurveyMethods
 
     # build and set context
     title = args[0]
+    args[1] ||= {}
+    context[:default_mandatory] = args[1].delete(:default_mandatory) || false
     self.attributes = ({
       :title => title,
-      :reference_identifier => reference_identifier }.merge(args[1] || {}))
+      :reference_identifier => reference_identifier }.merge(args[1]))
     context[:survey] = self
   end
   def clear(context)
@@ -165,7 +167,8 @@ module SurveyorParserSurveyMethods
       :bad_references => [],
       :duplicate_references => [],
       :dependency_conditions => [],
-      :questions_with_correct_answers => {}
+      :questions_with_correct_answers => {},
+      :default_mandatory => false
     })
   end
 end
@@ -239,6 +242,7 @@ module SurveyorParserQuestionMethods
     self.attributes = ({
       :question_group => context[:question_group],
       :reference_identifier => reference_identifier,
+      :is_mandatory => context[:default_mandatory],
       :text => text,
       :display_type => (original_method =~ /label|image/ ? original_method : "default"),
       :display_order => context[:survey_section].questions.size }.merge(hash_args))
@@ -295,9 +299,9 @@ module SurveyorParserDependencyConditionMethods
     a0, a1, a2 = args
     self.attributes = ({
       :operator => a1 || "==",
-      :question_reference => a0.to_s.gsub(/^q_/, ""),
+      :question_reference => a0.to_s.gsub(/^q_|^question_/, ""),
       :rule_key => reference_identifier
-    }.merge( a2.is_a?(Hash) ? a2 : { :answer_reference => a2.to_s.gsub(/^a_/, "") }))
+    }.merge( a2.is_a?(Hash) ? a2 : { :answer_reference => a2.to_s.gsub(/^a_|^answer_/, "") }))
     context[:dependency].dependency_conditions << context[:dependency_condition] = self
     context[:dependency_conditions] << self
   end

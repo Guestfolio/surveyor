@@ -128,6 +128,18 @@ describe Response, "applicable_attributes" do
   end
 end
 
+describe Response, '#to_formatted_s' do
+  context "when datetime" do
+    let(:r) { Response.new(:answer => Answer.new(:response_class => 'datetime')) }
+
+    it 'returns "" when nil' do
+      r.datetime_value = nil
+
+      r.to_formatted_s.should == ""
+    end
+  end
+end
+
 describe Response, '#json_value' do
   context "when integer" do
     let(:r) {Response.new(:integer_value => 2, :answer => Answer.new(:response_class => 'integer'))}
@@ -171,6 +183,36 @@ describe Response, '#json_value' do
     it "should be '10:30'" do
       r.json_value.should == '10:30'
       r.json_value.to_json.should == '"10:30"'
+    end
+  end
+end
+
+describe Response, 'value methods' do
+  let(:response) { Response.new }
+
+  describe '#date_value=' do
+    it 'accepts a parseable date string' do
+      response.date_value = '2010-01-15'
+      response.datetime_value.strftime('%Y %m %d').should == '2010 01 15'
+    end
+
+    it 'clears when given nil' do
+      response.datetime_value = Time.new
+      response.date_value = nil
+      response.datetime_value.should be_nil
+    end
+  end
+
+  describe 'time_value=' do
+    it 'accepts a parseable time string' do
+      response.time_value = '11:30'
+      response.datetime_value.strftime('%H %M %S').should == '11 30 00'
+    end
+
+    it 'clears when given nil' do
+      response.datetime_value = Time.new
+      response.time_value = nil
+      response.datetime_value.should be_nil
     end
   end
 end

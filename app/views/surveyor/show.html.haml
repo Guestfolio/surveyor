@@ -3,7 +3,7 @@
     .surveyor_flash
       = flash_messages(types)
       .close
-  = semantic_form_for(@response_set, :as => :r, :url => update_my_survey_path, :html => {:id => "survey_form", :class => @survey.custom_class}) do |f|
+  = semantic_form_for(@response_set, :as => :r, :url => surveyor.update_my_survey_path, :html => {:id => "survey_form", :class => @survey.custom_class}) do |f|
     .survey_title= @survey.title
     - @survey.sections.each do |section|
       = div_for section do
@@ -22,18 +22,18 @@
               - if answered_questions.length > 0 # there are answered questions in this section or group
                 - g = q.question_group
                 - renderer = g.renderer
-                
+
                 - unless label.blank?
                   = render q.custom_renderer || "/partials/question", :q => label, :f => f, :disableFlag => true
                   - label = nil
-                = f.inputs q_text(g), :id => "g_#{g.id}", :class => "g_#{renderer} #{g.css_class(@response_set)}" do
+                = f.inputs g.text_for(@render_context, I18n.locale), :id => "g_#{g.id}", :class => "g_#{renderer} #{g.css_class(@response_set)}" do
                   %li.help= g.help_text
                   - case renderer
                     - when :grid
                       %li
                         %table
                           %col.pre
-                          - group_questions.first.answers.each do |a| 
+                          - group_questions.first.answers.each do |a|
                             %col{:class => cycle("odd", "even")}
                           %col.post
                           %tbody
@@ -41,17 +41,18 @@
                               %tr
                                 %th &nbsp;
                                 - ten_questions.first.answers.each do |a|
-                                  %th= a_text(a)
+                                  %th
+                                    = a.text_for(nil, @render_context, I18n.locale)
+                                    %span.help= a.help_text_for(@render_context, I18n.locale)
                                 %th &nbsp;
                               - ten_questions.each_with_index do |q, j|
                                 %tr{:id => "q_#{q.id}", :class => "q_#{renderer} #{q.css_class(@response_set)}"}
-                                  - if q.pick == "one"
-                                    - r = response_for(@response_set, q, nil, g)
-                                    - j = response_idx  # increment the response index since the answer partial skips for q.pick == one
-                                  %th= q.split_text(:pre)
+                                  %th
+                                    = q.text_for(:pre, @render_context, I18n.locale)
+                                    = q.help_text_for(@render_context, I18n.locale)
                                   - q.answers.each do |a|
-                                    %td= render a.custom_renderer || '/partials/answer', :g => g, :q => q, :a => a, :f => f, :disableFlag => true
-                                  %th= q.split_text(:post)
+                                    %td= render(a.custom_renderer || '/partials/answer', :g => g, :q => q, :a => a, :f => f, :disableFlag => true) unless q.display_type == "label"
+                                  %th= q.text_for(:post, @render_context, I18n.locale)
                     - when :repeater
                       - (@response_set.count_group_responses(group_questions) + 1).times do |rg|
                         %li
@@ -59,19 +60,15 @@
                             = render q.custom_renderer || "/partials/question", :g => g, :rg => rg, :q => q, :f => f, :disableFlag => true
                     - else # :inline
                       - answered_questions.each do |q|
-                        = render q.custom_renderer || "/partials/question", :g => g, :q => q, :f => f, :disableFlag => true         
-              
+                        = render q.custom_renderer || "/partials/question", :g => g, :q => q, :f => f, :disableFlag => true
               - group_questions = []
               - answered_questions = []
-          - else 
+          - else
             - if q.display_type == 'label'
-              - label = q
-            - unless @response_set.responses.where( :question_id => q.id).empty?
-              - unless label.blank?
-                = render q.custom_renderer || "/partials/question", :q => label, :f => f, :disableFlag => true
-                - label = nil
+              = render q.custom_renderer || "/partials/question", :q => q, :f => f, :disableFlag => true
+            - elsif !(@response_set.responses.where(:question_id => q.id).empty?)
               = render q.custom_renderer || "/partials/question", :q => q, :f => f, :disableFlag => true
               - answered_count = answered_count + 1
           - if (i+1 >= questions.size) and (answered_count == 0)
             #{"--- No data ---"}
-          
+

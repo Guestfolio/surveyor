@@ -11,11 +11,18 @@ end
 When /^I start the survey$/ do
   steps %Q{
     When I go to the surveys page
-     And I press "Take it"
+      And I press "Take it"
   }
   @survey_code       = current_path.split("/")[2] # /surveys/:survey_code/:response_set_code/take
   @response_set_code = current_path.split("/")[3] # /surveys/:survey_code/:response_set_code/take
 end
+
+When /^I start the survey in "(.*?)"$/ do |locale|
+    step %Q{I go to the surveys page in "#{locale}"}
+    # these steps need to be separated so the url param has a chance to set I18n.locale
+    step %Q{I press "#{I18n.t 'surveyor.take_it'}"}
+end
+
 
 # When I fill in the (nth) (string) for "(ref_id)" with "(value to fill)"
 When /^I fill in the (\d+[a-z]{0,2} )?(\w+) for "([^"]+)" with "([^"]+)"$/ do |index, type, answer_reference_id, value|
@@ -112,6 +119,7 @@ end
 Then /^there should (not )?be a (\w+ )?response(?: for answer "([^"]+)")?(?: with value "([^"]+)")?(?: on question "([^"]+)")?$/ do |neg, type, answer_reference_id, value, question_reference_id|
   conditions = []
   values = []
+  where = {}
   expected_count = neg.blank? ? 1 : 0
   if type
     attribute = case type.strip
@@ -124,10 +132,8 @@ Then /^there should (not )?be a (\w+ )?response(?: for answer "([^"]+)")?(?: wit
                 end
     if value
       case type.strip
-      when 'date'
-        # Work around deficient SQLite date handling
-        conditions << "date(#{attribute}) = date(?)"
-        values << value
+      when 'date' || 'datetime' || 'time'
+        where[:datetime_value] = Time.zone.parse(value).utc
       else
         conditions << "#{attribute} = ?"
         values << value
@@ -155,7 +161,7 @@ Then /^there should (not )?be a (\w+ )?response(?: for answer "([^"]+)")?(?: wit
     values << answer
   end
 
-  Response.where(conditions.join(' AND '), *values).count.should == expected_count
+  Response.where(conditions.join(' AND '), *values).where(where).count.should == expected_count
 end
 
 Then /^I should see the image "([^"]*)"$/ do |src|
@@ -186,6 +192,23 @@ end
 
 Then /^the JSON response at "(.*?)" should correspond to an answer with text "(.*?)"$/ do |path, text|
   last_json.should be_json_eql(JsonSpec.remember("\"#{Answer.find_by_text(text).api_id}\"")).at_path(path)
+end
+
+Then /^the JSON representation for "(.*?)" should be:$/ do |title, string|
+  Survey.find_by_title(title).as_json.to_json.should be_json_eql(string)
+end
+
+Given /^I prefix the titles of exported surveys with "(.*?)"$/ do |prefix|
+  PREFIX = prefix
+  class Survey < ActiveRecord::Base
+    include Surveyor::Models::SurveyMethods
+    def filtered_for_json
+      dolly = self.clone
+      dolly.sections = self.sections
+      dolly.title = "#{PREFIX}#{dolly.title}"
+      dolly
+    end
+  end
 end
 
 ## Hidden and shown elements
@@ -244,15 +267,22 @@ Given /^I replace question numbers with letters$/ do
   end
 end
 
-
 ## Various input elements
 
-Then /^I should see (\d+) textareas on the page$/ do |i|
-  page.has_css?('textarea', :count => i)
+Then /^I should see (\d+) textarea(?:s?) on the page$/ do |i|
+  page.has_css?('textarea', :count => i).should == true
 end
 
-Then /^I should see (\d+) "(.*?)" input on the page$/ do |i, css_class|
-  page.has_css?("input.#{css_class}", :count => i)
+Then /^I should see (\d+) text input(?:s?) on the page$/ do |i|
+  page.has_css?('input[type="text"]', :count => i).should == true
+end
+
+Then /^I should see no text input(?:s?) on the page$/ do
+  page.has_css?('input[type="text"]').should == false
+end
+
+Then /^I should see (\d+) "(.*?)" input(?:s?) on the page$/ do |i, css_class|
+  page.has_css?("input.#{css_class}", :count => i).should == true
 end
 
 Then /^I should see (\d+) select on the page$/ do |i|
@@ -283,4 +313,13 @@ end
 
 Then /^the question "(.*?)" should have correct answer "(.*?)"$/ do |q, a|
   Question.find_by_reference_identifier(q).correct_answer.reference_identifier.should == a
+end
+
+## for Rails 3.0
+Then /^I set the asset directory$/ do
+  ActionController::Base.helpers.config.assets_dir = "public" unless asset_pipeline_enabled?
+end
+
+When(/^I change the locale to "(.*?)"$/) do |locale|
+  steps %Q{When I select "#{locale}" from "new_locale"}
 end

@@ -146,6 +146,43 @@ Feature: Survey export
     }
   """
 
+  Scenario: Exporting input mask and mask placeholder
+  Given I parse
+  """
+    survey "Personal" do
+      section "Guy" do
+        q "What is your phone number?"
+        a :string, :input_mask => '(999)999-9999', :input_mask_placeholder => '#'
+      end
+    end
+  """
+  And I visit "/surveys/personal.json"
+  Then the JSON should be:
+    """
+    {
+      "title": "Personal",
+      "uuid": "*",
+      "sections": [{
+        "display_order": 0,
+        "title": "Guy",
+        "questions_and_groups": [
+          { 
+            "uuid": "*", 
+            "text": "What is your phone number?",
+            "answers": [
+              {
+                "input_mask": "(999)999-9999",
+                "input_mask_placeholder": "#",
+                "text": "String",
+                "type": "string", 
+                "uuid": "*"
+              }
+            ]
+          }]
+        }]
+      }
+    """
+
   Scenario: Exporting response sets
   Given I parse
   """
@@ -242,3 +279,66 @@ Feature: Survey export
   Then the JSON at "responses" should have 1 entry
   And the JSON response at "responses/0/value" should be "blueish"
   And the JSON response at "responses/0/answer_id" should correspond to an answer with text "most favorite color"
+
+  Scenario: Exporting null datetime response
+  Given I parse
+  """
+    survey "Health" do
+      section "Doctor" do
+        question "When did you visit?", :pick => :one
+        a "Date", :date
+        a "Not sure"
+      end
+    end
+  """
+  And I start the "Health" survey
+  And I choose "Date"
+  And I press "Click here to finish"
+  And I export the response set
+  Then the JSON at "responses" should have 1 entry
+  And the JSON response at "responses/0/value" should be null
+
+  Scenario: Exporting non-existent surveys
+    When I visit "/surveys/simple-json.json"
+    Then I should get a "404" response
+
+  Scenario: Exporting with survey modifications
+  Given I parse
+  """
+    survey "Simple" do
+      section "Colors" do
+        question "What is your least favorite color?"
+        a "least favorite color", :string
+      end
+    end
+  """
+  When I prefix the titles of exported surveys with "NUBIC - "
+  Then the JSON representation for "Simple" should be:
+  """
+  {
+    "title": "NUBIC - Simple",
+    "uuid": "*",
+    "sections": [{
+      "title": "Colors",
+      "display_order":0,
+      "questions_and_groups": [
+        { "uuid": "*", "text": "What is your least favorite color?", "answers": [{"text": "least favorite color", "uuid": "*", "type": "string"}]}
+      ]
+    }]
+  }
+  """
+  When I visit "/surveys/simple.json"
+  Then the JSON should be:
+  """
+  {
+    "title": "NUBIC - Simple",
+    "uuid": "*",
+    "sections": [{
+      "title": "Colors",
+      "display_order":0,
+      "questions_and_groups": [
+        { "uuid": "*", "text": "What is your least favorite color?", "answers": [{"text": "least favorite color", "uuid": "*", "type": "string"}]}
+      ]
+    }]
+  }
+  """

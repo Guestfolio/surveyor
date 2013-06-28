@@ -280,7 +280,7 @@ Feature: Survey creation
   Scenario: Creating a question with an option checkbox for other and an empty text input
     Given I parse
     """
-      survey "Favorite Cuisine" do
+      survey "Favorite Cuisine again" do
         section "Foods" do
           q "What is the best cuisine?", :pick => :any
           a "french"
@@ -290,7 +290,7 @@ Feature: Survey creation
         end
       end
     """
-    When I start the "Favorite Cuisine" survey
+    When I start the "Favorite Cuisine again" survey
     And I change "r_4_string_value" to ""
     Then the "other" checkbox should not be checked
 
@@ -299,7 +299,7 @@ Feature: Survey creation
    Scenario: Creating a question with an option radio button for other and text input
     Given I parse
     """
-      survey "Favorite Cuisine" do
+      survey "Favorite Cuisine again again" do
         section "Foods" do
           q "What is the best cuisine?", :pick => :one
           a "french"
@@ -309,7 +309,7 @@ Feature: Survey creation
         end
       end
     """
-    When I start the "Favorite Cuisine" survey
+    When I start the "Favorite Cuisine again again" survey
     And I change "r_1_string_value" to "thai"
     Then the "other" radiobutton should be checked
 
@@ -507,9 +507,10 @@ Feature: Survey creation
         end
       end
     """
+      And I set the asset directory
     When I start the "Images" survey
     Then I should see the image "/images/surveyor/next.gif"
-    And I should see the image "/images/surveyor/prev.gif"
+      And I should see the image "/images/surveyor/prev.gif"
 
   @javascript
   Scenario: Creating and unchecking checkboxes
@@ -739,3 +740,156 @@ Feature: Survey creation
       And I should see "B. Barber"
       And I should see "C. Camel"
 
+  Scenario: help text
+    Given I parse
+    """
+      survey "Help!" do
+        section "Songs" do
+          q "Do you need anybody?", :pick => :one, :help_text => "select one of the following"
+          a "I need somebody to love", :help_text => "like The Beatles"
+          a "I am a rock, I am an island", :help_text => "like Simon and Garfunkel"
+
+          grid "How would these artists respond to 'Do you need anybody?'", :help_text => "in your opinion" do
+            a "Yes", :help_text => "would say yes"
+            a "No", :help_text => "would say no"
+            q "Bobby Darrin", :pick => :one
+            q "Kurt Cobain", :pick => :one
+            q "Ella Fitzgerald", :pick => :one
+            q "Kanye West", :pick => :one
+          end
+
+          repeater "Over and over" do
+            q "Row row row your boat", :pick => :any, :help_text => "the 1st part of a round"
+            a "gently down the stream", :help_text => "the 2nd part of a round"
+            a "merrily merrily merrily merrily", :help_text => "the 3rd part of a round"
+            a "life is but a dream", :help_text => "the 4th part of a round"
+          end
+        end
+      end
+    """
+    When I start the "Help!" survey
+    Then I should see "select one of the following"
+      And I should see "like The Beatles"
+      And I should see "like Simon and Garfunkel"
+      And I should see "in your opinion"
+      And I should see "would say yes"
+      And I should see "would say no"
+      And I should see "the 1st part of a round"
+      And I should see "the 2nd part of a round"
+      And I should see "the 3rd part of a round"
+      And I should see "the 4th part of a round"
+
+  Scenario: labels in groups
+    Given I parse
+    """
+      survey "Labels" do
+        section "One" do
+          group "Grouped" do
+            label "Grouped greetings"
+            a "Your response", :string
+          end
+          group "Inline group", :display_type => :inline do
+            label "Inline greetings"
+            a "Your response", :string
+          end
+          repeater "Repeater" do
+            label "Repeater greetings"
+            a "Your response", :string
+          end
+          grid "Grid" do
+            a "Grid response", :string
+            label "Grid greetings"
+          end
+        end
+      end
+    """
+    When I start the "Labels" survey
+    Then I should see "Grouped greetings"
+      And I should see "Inline greetings"
+      And I should see "Repeater greetings"
+      And I should see "Grid greetings"
+      And I should not see "Your response"
+      And I should see "Grid response"
+      And I should see no text inputs on the page
+
+  @javascript
+  Scenario: dates in pick one
+    Given I parse
+    """
+      survey "Dates" do
+        section "One" do
+          q_test_1 "When will you stop by?", :pick=>:one
+          a_date "On", :date, :custom_class => "date"
+          a_neg_1 "REFUSED"
+          a_neg_2 "DON'T KNOW"
+        end
+        section "Two" do
+          label "second section"
+        end
+      end
+    """
+    When I start the survey
+      And I click "On"
+      And I click the first date field
+      And I select "Mar" as the datepicker's month
+      And I select "2013" as the datepicker's year
+      And I follow "9"
+    Then there should be a date response with value "2013-03-09"
+    When I press "Two"
+      And I press "One"
+    Then the first date field should contain "2013-03-09"
+      And the first date field should not contain "2013-03-09 00:00:00.000000"
+
+  @javascript
+  Scenario: input mask and input mask placeholder
+    Given I parse
+    """
+      survey "Personal" do
+        section "One" do
+          q "What is your phone number?"
+          a "phone", :string, :input_mask => '(999)999-9999', :input_mask_placeholder => '#'
+        end
+      end
+    """
+    When  I start the "Personal" survey
+      And I fill in "phone" with "1234567890"
+      And I press "Click here to finish"
+    Then there should be 1 response set with 1 responses with:
+      | string_value  |
+      | (123)456-7890 |
+
+    @javascript
+    Scenario: numeric input mask with alphanumeric input
+    Given I parse
+    """
+      survey "Personal" do
+        section "One" do
+          q "What is your phone number?"
+          a 'phone', :string, :input_mask => '(999)999-9999'
+        end
+      end
+    """
+    When  I start the "Personal" survey
+      And I fill in "phone" with "1a2b3c4d5e6f7g8h9i0"
+      And I press "Click here to finish"
+    Then there should be 1 response set with 1 responses with:
+      | string_value  |
+      | (123)456-7890 |
+
+    @javascript
+    Scenario: alpha input mask with alphanumeric input
+    Given I parse
+    """
+      survey "Personal" do
+        section "One" do
+          q "What are your favorite letters?"
+          a 'letters', :string, :input_mask => 'aaaaaaaaa'
+        end
+      end
+    """
+    When  I start the "Personal" survey
+      And I fill in "letters" with "1a2b3c4d5e6f7g8h9i0"
+      And I press "Click here to finish"
+    Then there should be 1 response set with 1 responses with:
+      | string_value  |
+      | abcdefghi     |

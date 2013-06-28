@@ -1,7 +1,64 @@
 History for Surveyor
 ====================
 
-1.1.1
+1.4.1
+-----
+
+### Fixes
+
+- Handle `nil` in `ResponseMethods#date_value=` and `ResponseMethods#time_value`.
+  (#450)
+- Handle `nil` datetime values in `ResponseMethods#to_formatted_s`.  (#459)
+
+1.4.0
+-----
+### Features
+
+- Routes are namespaced (e.g. `surveyor.available_surveys_path`) and may be mounted at a different root (e.g. `mount Surveyor::Engine, :at => '/instruments'`) (#398, #421)
+- Surveyor::Parser.parse_file takes an options[:filename] parameter, used to locate translations (#429)
+- Surveyor::Parser allows translations to be specified inline using a hash (#429)
+- require locale of survey when translations are present (#426)
+- locale selection in survey UI (#427)
+
+### Fixes
+
+- Remove default order on Response. (#423)
+- Bug fix for RedCap Parser for DependencyConditions. thanks @ariel-perez-birchbox
+- Make Surveyor::Parser accept Answer#reference_identifier via underscore or hash syntax (#439)
+- Fix show action and have it use new translation view methods (#438, #442) thanks @alanjcfs
+- Fix times showing in UTC when time zone is specified in Rails (#435)
+
+### Dependencies
+
+- Removing support for Rails 3.0. Applications requiring Rails 3.0 should use Surveyor v1.3.0
+
+1.3.0
+-----
+
+### Features
+
+- Upgrade to jQuery UI 1.10.0, jQuery 1.9.0, jQueryUI timepicker addons 1.2, and remove jQuery tools (#409)
+- Upgrade reset css
+- Added surveyor_translations table to support YAML-based localizations of surveys. (#420)
+- Add extension point for pre-JSON-export survey modifications (#416)
+- Add input mask for text entry fields (#415)
+
+### Fixes
+
+- Export null when datetime response has null datetime value
+- Move the help text to be after the answer text (#401)
+- Fix response serialization for date pick one answers (#400)
+- Remove ordering default scope on survey section methods (#417, #290)
+- Answers of labels should not be shown, within or without groups (#304)
+- Inline group questions should display inline (#303)
+- Evaluate all submitted questions for depdencies (#396)
+- Pick one answers with dates should display their dates correctly (#378)
+
+### Infrastructure
+
+- Added stacktests.sh shell script for testing different stacks
+
+1.2.0
 -----
 
 ### Features
@@ -13,6 +70,11 @@ History for Surveyor
 ### Fixes
 
 - Surveyor will never require 'fastercsv' on Ruby 1.9. (#381)
+- Add question_groups/question/answer/reference_identifier to JSON
+  serialization for Survey. (#390)
+- Evaluate dependencies even when the last response is removed (#362, #215)
+- Add answer help text (#373)
+- SurveyorController#export now renders 404 when surveys are not found (#391)
 
 1.1.0
 -----

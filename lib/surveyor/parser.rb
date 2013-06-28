@@ -1,4 +1,7 @@
-%w(survey survey_section question_group question dependency dependency_condition answer validation validation_condition).each {|model| require model }
+%w(survey survey_translation survey_section question_group question dependency dependency_condition answer validation validation_condition).each {|model| require model }
+
+require 'yaml'
+
 module Surveyor
   class ParserError < StandardError; end
   class Parser
@@ -8,6 +11,9 @@ module Surveyor
     attr_accessor :context
 
     # Class methods
+    def self.parse_file(filename, options={})
+      self.parse(File.read(filename),{:filename => filename}.merge(options))
+    end
     def self.parse(str, options={})
       self.ensure_attrs
       self.options = options
@@ -63,7 +69,7 @@ module Surveyor
     def method_missing(missing_method, *args, &block)
       method_name, reference_identifier = missing_method.to_s.split("_", 2)
       type = full(method_name)
-      Surveyor::Parser.raise_error( "\"#{type}\" is not a surveyor method." )if !%w(survey survey_section question_group question dependency dependency_condition answer validation validation_condition).include?(type)
+      Surveyor::Parser.raise_error( "\"#{type}\" is not a surveyor method." )if !%w(survey survey_translation survey_section question_group question dependency dependency_condition answer validation validation_condition).include?(type)
 
       Surveyor::Parser.rake_trace(reference_identifier.blank? ? "#{type} #{args.map(&:inspect).join ', '}" : "#{type}_#{reference_identifier} #{args.map(&:inspect).join ', '}",
                                   block_models.include?(type) ? 2 : 0)
@@ -82,6 +88,7 @@ module Surveyor
           resolve_dependency_condition_references
           resolve_question_correct_answers
           report_lost_and_duplicate_references
+          report_missing_default_locale
           Surveyor::Parser.rake_trace("", -2)
           if context[:survey].save
             Surveyor::Parser.rake_trace "Survey saved."
@@ -100,6 +107,7 @@ module Surveyor
 
     def full(method_name)
       case method_name.to_s
+      when /^translations$/; "survey_translation"
       when /^section$/; "survey_section"
       when /^g$|^grid$|^group$|^repeater$/; "question_group"
       when /^q$|^label$|^image$/; "question"
@@ -114,6 +122,11 @@ module Surveyor
     end
     def block_models
       %w(survey survey_section question_group)
+    end
+    def report_missing_default_locale
+      if !self.context[:survey].translations.empty? && self.context[:survey].translations.select{|t|YAML::load(t.translation)=={}}.empty?
+        Surveyor::Parser.raise_error("No default locale specified for translations.",true)
+      end
     end
     def report_lost_and_duplicate_references
       Surveyor::Parser.raise_error("Bad references: #{self.context[:bad_references].join("; ")}", true) unless self.context[:bad_references].empty?
@@ -174,6 +187,25 @@ module SurveyorParserSurveyMethods
 end
 
 # SurveySection model
+module SurveyorParserSurveyTranslationMethods
+  def parse_and_build(context, args, original_method, reference_identifier)
+    dir = Surveyor::Parser.options[:filename].nil? ? Dir.pwd : File.dirname(Surveyor::Parser.options[:filename])
+    # build, no change in context
+    args[0].each do |k,v|
+      case v
+      when Hash
+        trans = YAML::dump(v)
+      when String
+        trans = File.read(File.join(dir,v))
+      when :default
+        trans = YAML::dump({})
+      end
+      context[:survey].translations << self.class.new(:locale => k.to_s, :translation => trans)
+    end
+  end
+end
+
+# SurveySection model
 module SurveyorParserSurveySectionMethods
   def parse_and_build(context, args, original_method, reference_identifier)
     # clear context
@@ -183,6 +215,7 @@ module SurveyorParserSurveySectionMethods
     title = args[0]
     self.attributes = ({
       :title => title,
+      :reference_identifier => reference_identifier,
       :display_order => context[:survey].sections.size }.merge(args[1] || {}))
     context[:survey].sections << context[:survey_section] = self
   end
@@ -208,6 +241,7 @@ module SurveyorParserQuestionGroupMethods
     # build and set context
     self.attributes = ({
       :text => args[0] || "Question Group",
+      :reference_identifier => reference_identifier,
       :display_type => (original_method =~ /grid|repeater/ ? original_method : "default")}.merge(args[1] || {}))
     context[:question_group] = self
   end
@@ -324,10 +358,10 @@ module SurveyorParserAnswerMethods
       self.attributes = ({:display_order => context[:question].answers.size}.merge(attrs))
       context[:question].answers << context[:answer] = self
       # keep reference for dependencies
-      unless context[:question].reference_identifier.blank? or reference_identifier.blank?
+      unless context[:question].reference_identifier.blank? or self.reference_identifier.blank?
         context[:answer_references][context[:question].reference_identifier] ||= {}
-        context[:duplicate_references].push "q_#{context[:question].reference_identifier}, a_#{reference_identifier}" if context[:answer_references][context[:question].reference_identifier].has_key?(reference_identifier)
-        context[:answer_references][context[:question].reference_identifier][reference_identifier] = context[:answer]
+        context[:duplicate_references].push "q_#{context[:question].reference_identifier}, a_#{self.reference_identifier}" if context[:answer_references][context[:question].reference_identifier].has_key?(self.reference_identifier)
+        context[:answer_references][context[:question].reference_identifier][self.reference_identifier] = context[:answer]
       end
     end
   end

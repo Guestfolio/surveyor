@@ -7,7 +7,7 @@ module Surveyor
         # Associations
         base.send :belongs_to, :survey
         base.send :belongs_to, :user
-        base.send :has_many, :responses, :dependent => :destroy
+        base.send :has_many, :responses, :order => "#{Response.quoted_table_name}.created_at ASC", :dependent => :destroy
         base.send :accepts_nested_attributes_for, :responses, :allow_destroy => true
 
         @@validations_already_included ||= nil
@@ -181,6 +181,7 @@ module Surveyor
       protected
 
       def dependencies(question_ids = nil)
+        question_ids = survey.sections.map(&:questions).flatten.map(&:id) if responses.blank? and question_ids.blank?
         deps = Dependency.all(:include => :dependency_conditions,
           :conditions => {:dependency_conditions => {:question_id => question_ids || responses.map(&:question_id)}})
         # this is a work around for a bug in active_record in rails 2.3 which incorrectly eager-loads associatins when a

@@ -7,14 +7,19 @@ rescue LoadError => e
 end
 require 'rspec/rails'
 require 'factories'
-
+require 'json_spec'
 require 'database_cleaner'
+
+# for asset_pipeline_enabled? in models
+include Surveyor::Helpers::AssetPipeline
 
 # Requires supporting ruby files with custom matchers and macros, etc,
 # in spec/support/ and its subdirectories.
 Dir[Rails.root.join("spec/support/**/*.rb")].each {|f| require f}
 
 RSpec.configure do |config|
+  config.include JsonSpec::Helpers
+
   config.treat_symbols_as_metadata_keys_with_true_values = true
 
   # == Mock Framework

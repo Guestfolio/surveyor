@@ -361,3 +361,116 @@ Feature: Survey dependencies
     When I check "Once for you"
     Then the element "#q_3" should not be hidden
       And the element "#q_2" should be hidden
+
+  @javascript
+  Scenario: Dependency evaluation when the last response is removed
+    Given I parse
+      """
+      survey "Heating" do
+        section "Basics" do
+          q_heating_1 "How do you heat your home?", :pick => :any
+          a_1 "Forced air"
+          a_2 "Radiators"
+          a_3 "Oven"
+          a_4 "Passive"
+
+          q_heating_2 "How much does it cost to run your non-passive heating solutions?"
+          dependency :rule => "A"
+          condition_A :q_heating_1, "==", :a_1
+          a_1 "$", :float
+        end
+      end
+      """
+    When I go to the surveys page
+      And I start the "Heating" survey
+    Then the question "How much does it cost to run your non-passive heating solutions?" should be hidden
+      And I check "Forced air"
+    Then the question "How much does it cost to run your non-passive heating solutions?" should be triggered
+      And I uncheck "Forced air"
+    Then the question "How much does it cost to run your non-passive heating solutions?" should be hidden
+
+  @javascript
+  Scenario: Dependency evaluation within groups
+    Given I parse
+      """
+      survey "Body" do
+        section "Joints" do
+          group "Muscle" do
+            q_muscles_joints_bones "Muscles, Joints, Bones", :pick => :any, :data_export_identifier => "muscles_joints_bones"
+            a_1 "Weakness"
+            a_2 "Arthritis"
+            a_3 "Cane/Walker"
+            a_4 "Morning stiffness"
+            a_5 "Joint pain"
+            a_6 "Muscle tenderness"
+            a_7 :other
+
+            q_muscles_joints_bones_other "Explain", :data_export_identifier => "muscles_joints_bones_other"
+            dependency :rule => "A"
+            condition_A :q_muscles_joints_bones, "==", :a_7
+            a "Explain", :string
+          end
+        end
+      end
+      """
+    When I go to the surveys page
+      And I start the "Body" survey
+    Then the question "Explain" should be hidden
+    When I check "Other"
+    Then the question "Explain" should be triggered
+    When I uncheck "Other"
+    Then the question "Explain" should be hidden
+
+  @javascript
+  Scenario: Dependencies on multi-select (from the kitchen sink)
+    Given I parse
+    """
+    survey "Colors" do
+      section "Dependencies" do
+        question "What is your favorite color?", :pick => :one
+        answer "red is my fav"
+        answer "blue is my fav"
+        answer "green is my fav"
+        answer "yellow is my fav"
+        answer :other
+
+        q_2 "Choose the colors you don't like", :pick => :any
+        a_1 "red"
+        a_2 "blue"
+        a_3 "green"
+        a_4 "yellow"
+        a :omit
+
+        q_2a "Please explain why you don't like this color?"
+        a_1 "explanation", :text, :help_text => "Please give an explanation for each color you don't like"
+        dependency :rule => "A or B or C or D"
+        condition_A :q_2, "==", :a_1
+        condition_B :q_2, "==", :a_2
+        condition_C :q_2, "==", :a_3
+        condition_D :q_2, "==", :a_4
+
+        q_2b "Please explain why you dislike so many colors?"
+        a_1 "explanation", :text
+        dependency :rule => "Z"
+        condition_Z :q_2, "count>2"
+      end
+    end
+    """
+    When I go to the surveys page
+      And I start the "Colors" survey
+      And I choose "red is my fav"
+    Then the question "Please explain why you don't like this color?" should be hidden
+      And the question "Please explain why you dislike so many colors?" should be hidden
+    When I check "red"
+    Then the question "Please explain why you don't like this color?" should be triggered
+      And the question "Please explain why you dislike so many colors?" should be hidden
+    When I check "blue"
+      And I check "green"
+    Then the question "Please explain why you don't like this color?" should be triggered
+      And the question "Please explain why you dislike so many colors?" should be triggered
+    When I uncheck "red"
+      And I uncheck "blue"
+      And I uncheck "green"
+    Then the question "Please explain why you don't like this color?" should be hidden
+      And the question "Please explain why you dislike so many colors?" should be hidden
+

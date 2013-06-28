@@ -10,7 +10,19 @@ module Surveyor
         if asset_pipeline_enabled?
           stylesheet_link_tag('surveyor_all') + javascript_include_tag('surveyor_all')
         else
-          stylesheet_link_tag('surveyor/reset', 'surveyor/dateinput', 'surveyor/jquery-ui.custom', 'surveyor/jquery-ui-timepicker-addon', 'surveyor', 'custom') + javascript_include_tag('surveyor/jquery.tools.min', 'surveyor/jquery-ui', 'surveyor/jquery-ui-timepicker-addon', 'surveyor/jquery.surveyor')
+          stylesheet_link_tag('surveyor/reset',
+                              'surveyor/jquery-ui-1.10.0.custom',
+                              'surveyor/jquery-ui-timepicker-addon',
+                              'surveyor/ui.slider.extras',
+                              'surveyor/results',
+                              'surveyor',
+                              'custom') +
+          javascript_include_tag('surveyor/jquery-1.9.0',
+                                  'surveyor/jquery-ui-1.10.0.custom',
+                                  'surveyor/jquery-ui-timepicker-addon',
+                                  'surveyor/jquery.selectToUISlider',
+                                  'surveyor/jquery.surveyor',
+                                  'surveyor/jquery.maskedinput')
         end
       end
       # Helper for displaying warning/notice/error flash messages
@@ -28,7 +40,7 @@ module Surveyor
         "&nbsp;&nbsp;You answered &quot;#{trigger_responses.join("&quot; and &quot;")}&quot; to the question &quot;#{dependent_questions.map(&:text).join("&quot;,&quot;")}&quot;"
       end
       def menu_button_for(section)
-        submit_tag(section.title, :name => "section[#{section.id}]")
+        submit_tag(section.translation(I18n.locale)[:title], :name => "section[#{section.id}]")
       end
       def previous_section
         # use copy in memory instead of making extra db calls
@@ -40,11 +52,8 @@ module Surveyor
       end
 
       # Questions
-      def q_text(obj, context=nil)
-
-        return image_tag(obj.text) if obj.is_a?(Question) and obj.display_type == "image"
-        return obj.render_question_text(context) if obj.is_a?(Question) and (obj.dependent? or obj.display_type == "label" or obj.part_of_group?)
-        "#{next_question_number(obj)}#{obj.render_question_text(context)}"
+      def q_text(q, context=nil, locale=nil)
+        "#{next_question_number(q) unless (q.dependent? or q.display_type == "label" or q.display_type == "image" or q.part_of_group?)}#{q.text_for(nil, context, locale)}"
       end
 
       def next_question_number(question)
@@ -52,24 +61,7 @@ module Surveyor
         "<span class='qnum'>#{@n += 1}) </span>"
       end
 
-      # def split_text(text = "") # Split text into with "|" delimiter - parts to go before/after input element
-      #   {:prefix => text.split("|")[0].blank? ? "&nbsp;" : text.split("|")[0], :postfix => text.split("|")[1] || "&nbsp;"}
-      # end
-      # def question_help_helper(question)
-      #   question.help_text.blank? ? "" : %Q(<span class="question-help">#{question.help_text}</span>)
-      # end
-
-      # Help_text
-      def render_help_text(obj, context=nil)
-        obj.render_help_text(context)
-      end
-
-      # Answers
-      def a_text(obj, pos=nil, context = nil)
-        return image_tag(obj.text) if obj.is_a?(Answer) and obj.display_type == "image"
-        obj.split_or_hidden_text(pos, context)
-      end
-
+      # Responses
       def rc_to_attr(type_sym)
         case type_sym.to_s
         when /^answer$/ then :answer_id
@@ -84,11 +76,15 @@ module Surveyor
         end
       end
 
-      def generate_pick_none_input_html(value, default_value, css_class, response_class, disabled)
+      def generate_pick_none_input_html(value, default_value, css_class, response_class, disabled, input_mask, input_mask_placeholder)
         html = {}
         html[:class] = [response_class,css_class].reject{ |c| c.blank? }
-        html[:value] = default_value if value.blank?
+        html[:value] = value.blank? ? default_value : value
         html[:disabled] = disabled unless disabled.blank?
+        if input_mask
+          html[:'data-input-mask'] = input_mask
+          html[:'data-input-mask-placeholder'] = input_mask_placeholder unless input_mask_placeholder.blank?
+        end
         html
       end
 
